@@ -1,6 +1,4 @@
-"""
-Gemini API — viral English scripts optimized for organic reach.
-"""
+"""Generate original ToonZo story ideas and scene-by-scene cartoon scripts."""
 import json
 import re
 import time
@@ -53,88 +51,122 @@ def _parse_json(text: str):
 
 def generate_topics(count: int, kind: str, used: list, performance: dict = None) -> list:
     style = (
-        "3-4 minute viral facts video"
+        "3-5 minute cartoon episode"
         if kind == "long"
-        else "45-second viral YouTube Short (ONE shocking fact)"
+        else "under-60-second cartoon Short"
     )
-    prompt = f"""You are an audience-first YouTube strategist for a worldwide English facts channel.
+    prompt = f"""You are the story editor for ToonZo Official, an original English-language cartoon channel.
 
-Generate exactly {count} fresh, specific topics for a {style}. Privately compare candidate ideas, then return only the strongest ones.
+Generate exactly {count} fresh, specific story ideas for a {style}. Privately compare candidate ideas, then return only the strongest ones.
 
-Pick ONLY from these proven viral categories:
-- Science facts that sound impossible but are true
-- Dark or shocking history most people never learned in school  
-- Space & universe facts with mind-bending scale
-- Human body / psychology facts that feel personal
-- Animal abilities that seem like superpowers
-- World records that sound fake
-- "You've been doing X wrong your whole life" revelations
-- FIFA World Cup 2026 shocking stats, records, untold stories
-- Famous things that have a completely different secret origin
+Use the recurring original characters Milo the curious orange fox and Tilly the kind teal turtle.
+Create imaginative, warm, funny adventures with a clear problem, teamwork, and a satisfying ending.
 
 RULES:
-- Prefer a concrete, surprising claim that creates an immediate question, not a broad subject such as "space facts"
-- Favor novelty, broad relevance, clear stakes, and a visual idea viewers understand instantly
-- Use the performance signal to explore adjacent angles to topics that earned more views; do not repeat their wording or assume views prove why they worked
-- Facts must be specific and checkable; never invent numbers, quotes, records, or scientific explanations
-- Avoid recycled trivia, vague superlatives, fabricated mystery, and claims framed as current trends without live evidence
-- Visually supportable by stock footage, with original explanation that adds value beyond generic footage
-- Each topic completely different from: {json.dumps(used[-150:], ensure_ascii=False)}
-- Use this recent performance signal as a directional guide; create fresh topics, do not copy:
+- Make every idea original, child-safe, easy to understand, and straightforward to show in a simple 2D cartoon
+- Do not use existing copyrighted characters, franchises, catchphrases, or storylines
+- Give each story a distinct premise; do not repeat these previous topics: {json.dumps(used[-150:], ensure_ascii=False)}
+- Use this performance signal only as a directional guide; create fresh ideas:
 {json.dumps((performance or {}).get(kind, {}), ensure_ascii=False)}
-- For Shorts, choose one singular fact with a fast payoff; for long videos, choose a focused subject that supports a coherent 5-7 point story
-- For Shorts: ONE singular fact, not a list
+- Short ideas need one simple conflict and a quick payoff; long ideas need a coherent beginning, middle, and end
 
 Respond ONLY with a JSON array of strings. No other text."""
-    return _parse_json(_ask_gemini(prompt))[:count]
+    topics = _parse_json(_ask_gemini(prompt))
+    if not isinstance(topics, list) or not all(
+        isinstance(topic, str) and topic.strip() for topic in topics
+    ):
+        raise ValueError("Gemini must return a JSON array of non-empty story ideas")
+    return [topic.strip() for topic in topics[:count]]
 
 
-def generate_script(topic: str, kind: str) -> dict:
-    words = config.LONG_TARGET_WORDS if kind == "long" else config.SHORT_TARGET_WORDS
-
+def generate_script(topic: str, kind: str, used_titles: list = None) -> dict:
     if kind == "short":
         structure = """
-SHORTS SCRIPT RULES (every rule is critical):
-- First sentence delivers the specific, accurate payoff immediately; no greeting, filler, or generic "did you know"
-- Explain why it is surprising in a simple mini-story, then end on a satisfying implication or reveal
-- Use short natural sentences and concrete details; do not repeat the hook in different words
-- End with a brief, natural follow prompt only if it fits without weakening the payoff
-- Under 80 words total. Every word earns its place."""
+SHORT CARTOON RULES:
+- Tell one complete mini-story with a clear opening, small problem, teamwork, and funny or warm payoff
+- Use short, natural spoken English and simple child-safe language
+- Keep narration under 80 words; no greeting, filler, or subscribe prompt"""
     else:
-        structure = """
-LONG VIDEO SCRIPT RULES:
-- Open with the central surprising fact and the question the video will answer; no greeting or filler intro
-- Build a coherent story through 5-7 connected facts, with useful context and clear transitions
-- Vary sentence rhythm and explain unfamiliar terms in plain English; do not pad or repeat claims
-- Resolve the opening question with a strong, accurate payoff
-- End with a brief, natural subscribe prompt
-- ~400 words, conversational and energetic"""
+        structure = f"""
+LONG CARTOON RULES:
+- Tell a complete 3-5 minute adventure with a strong opening, escalating problem, teamwork, and satisfying ending
+- Use simple, natural spoken English, expressive dialogue, and clear scene transitions
+- Aim for about {config.LONG_TARGET_WORDS} narration words; do not pad or repeat
+- End with a brief, natural subscribe prompt"""
 
-    prompt = f"""Write a YouTube {'Short' if kind == 'short' else 'video'} package for: "{topic}"
+    scene_count = "4 to 6" if kind == "short" else "8 to 12"
+    prompt = f"""Write an original ToonZo Official cartoon package for this story idea: "{topic}"
 
 {structure}
+Previously used video titles (do not repeat or closely rephrase): {json.dumps((used_titles or [])[-100:], ensure_ascii=False)}
+For a Short, keep the complete narration under {config.SHORT_TARGET_WORDS} words.
 
 DELIVER a JSON object with these exact keys:
 
-"hook_text": MAX 8 WORDS. The single most shocking sentence from this topic — written for display ON SCREEN in big text. Must work WITHOUT sound context. No punctuation except !. Examples: "YOUR DNA MATCHES A BANANA 60 PERCENT", "VENUS DAY IS LONGER THAN VENUS YEAR", "CLEOPATRA LIVED CLOSER TO IPHONE THAN PYRAMIDS". ALL CAPS.
+"hook_text": A short, child-safe opening hook of at most 8 words, in ALL CAPS.
 
-"script": The full voiceover script following the rules above. Natural spoken English, energetic tone. No emojis, no stage directions.
+"scenes": An array of {scene_count} objects. Each object has:
+  "narration": the exact spoken narration for this scene,
+  "setting": a concise visual setting (for example forest, beach, city, cave, or space),
+  "action": a simple visual action or prop for the scene,
+  "mood": one of happy, worried, surprised, curious, sad, or excited.
+"script": The complete narration in scene order, joined into one natural voiceover. It must exactly match the scene narration.
 
-"title": Specific, concise, curiosity-building title that accurately promises the video's real payoff. Avoid fake percentages, unsupported superlatives, and stock phrases such as "scientists can't explain" unless literally true. Under 90 characters. {"End with ' #Shorts'" if kind == 'short' else ""}
+"title": A compelling, specific, family-friendly title under 70 characters. Use normal title case, not ALL CAPS. Build curiosity around this story's unique problem or payoff; avoid generic/repeated templates such as "The Magic Adventure" and do not put the channel name in the title. {"End with ' #Shorts'" if kind == 'short' else ""}
 
-"description": Line 1 = hook (same shocking opener as script). Line 2 = "Subscribe for daily mind-blowing facts! 🔔". Line 3 = 12 hashtags: #Facts #MindBlowing #DidYouKnow #Science #History #Amazing #FunFacts #Shorts #FactsBaaz17 #LearnOnYouTube + 2 topic-specific tags.
+"description": A short, accurate summary of this original cartoon, followed by relevant hashtags including #ToonZoOfficial and #Cartoon. Include #Shorts for a Short.
 
-"tags": 15 SEO English tags, mix of broad and specific.
-
-"keywords": 5 simple English words for stock footage (e.g. "space", "ocean", "lion").
-
-QUALITY: Do not fabricate facts or certainty. Keep every claim consistent with the topic, and make the title and hook accurately match the script. No medical advice or misleading clickbait.
+"tags": Up to 15 relevant English tags.
+QUALITY: Keep the story original and suitable for a general family audience. Do not mention or imitate existing copyrighted characters or franchises. Do not include unsafe instructions, frightening details, or misleading metadata.
 
 Respond ONLY with the JSON object. No other text."""
 
     data = _parse_json(_ask_gemini(prompt))
+    scenes = data.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        raise ValueError("Generated cartoon package must contain a non-empty scenes array")
+    min_scenes, max_scenes = (4, 6) if kind == "short" else (8, 12)
+    if not min_scenes <= len(scenes) <= max_scenes:
+        raise ValueError(
+            f"Generated {kind} must have {min_scenes}-{max_scenes} scenes; got {len(scenes)}"
+        )
+    normalized_scenes = []
+    for index, scene in enumerate(scenes, 1):
+        if not isinstance(scene, dict):
+            raise ValueError(f"Generated scene {index} must be a JSON object")
+        narration = scene.get("narration")
+        if not isinstance(narration, str) or not narration.strip():
+            raise ValueError(f"Generated scene {index} has no narration")
+        normalized_scenes.append({
+            "narration": narration.strip(),
+            "setting": str(scene.get("setting", "forest")),
+            "action": str(scene.get("action", "")),
+            "mood": str(scene.get("mood", "curious")).lower(),
+        })
+    data["scenes"] = normalized_scenes
+    scene_script = " ".join(scene["narration"] for scene in normalized_scenes)
+    provided_script = data.get("script")
+    if not isinstance(provided_script, str) or provided_script.strip() != scene_script:
+        data["script"] = scene_script
+    if kind == "short" and len(scene_script.split()) > config.SHORT_TARGET_WORDS:
+        raise ValueError(
+            f"Generated Short script exceeds {config.SHORT_TARGET_WORDS} words"
+        )
+    data.setdefault("title", topic[:90])
+    data.setdefault("description", "An original ToonZo Official cartoon adventure. #ToonZoOfficial #Cartoon")
+    data.setdefault("tags", ["ToonZo Official", "cartoon", "animation"])
+    data.setdefault("hook_text", topic.upper()[:40])
+    if not isinstance(data["title"], str) or not data["title"].strip():
+        raise ValueError("Generated cartoon package must contain a non-empty title")
+    data["title"] = data["title"].strip()
+    if len(data["title"]) > 100:
+        raise ValueError("Generated title exceeds YouTube's 100-character title limit")
+    if not isinstance(data.get("description"), str):
+        raise ValueError("Generated package description must be text")
+    if not isinstance(data.get("tags"), list) or not all(
+        isinstance(tag, str) for tag in data["tags"]
+    ):
+        raise ValueError("Generated package tags must be an array of strings")
     data["topic"] = topic
     data["kind"] = kind
-    if "hook_text" not in data:
-        data["hook_text"] = topic.upper()[:40]
     return data

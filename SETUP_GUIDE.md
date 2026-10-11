@@ -1,125 +1,56 @@
-# YouTube Faceless Channel — Full Automation (Rs. 0/month)
+# ToonZo Official — Setup Guide
 
-Roz **1 long video + 4 Shorts** khud ban kar upload hongi. Setup sirf **ek baar** karna hai; GitHub scheduled runs best-effort hote hain, is liye Actions history check karte rahen.
+## Current workflow status
 
----
+The GitHub Action currently runs **manually for preview only**. It does not schedule uploads and YouTube upload is disabled by default. The target is configured to render one long video and four Shorts per run, using original Milo-and-Tilly 2D scenes.
 
-## System kaise kaam karta hai
+## 1. Install locally
 
-```
-GitHub Actions (roz 6:30 PM PKT par chalta hai)
-   │
-   ├─ 1. Gemini API ........... topics + Urdu scripts likhta hai
-   ├─ 2. edge-tts ............. Urdu voiceover banata hai (free, no key)
-   ├─ 3. Pexels API ........... stock footage download karta hai
-   ├─ 4. FFmpeg/MoviePy ....... final video render karta hai
-   └─ 5. YouTube API .......... channel par upload karta hai
+Install Python 3.12 and FFmpeg, then in PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
----
+Set `GEMINI_API_KEY` in the environment, then start a preview:
 
-## STEP 1 — Gemini API key (free) — 2 min
+```powershell
+$env:GEMINI_API_KEY = "your_rotated_key"
+python main.py
+```
 
-1. https://aistudio.google.com/apikey kholein
-2. Google account se login → **Create API key**
-3. Key copy kar ke kahin save kar lein → yeh `GEMINI_API_KEY` hai
+The output MP4 and SRT files are created in `output/`.
 
-## STEP 2 — Pexels API key (free) — 2 min
+## 2. Render a GitHub preview
 
-1. https://www.pexels.com/api/ kholein → **Get Started** → account banayein
-2. Dashboard se API key copy karein → yeh `PEXELS_API_KEY` hai
+1. Revoke and replace any API key that was shared in chat.
+2. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
+3. Add `GEMINI_API_KEY` with the rotated key.
+4. Open **Actions → ToonZo Cartoon Preview → Run workflow**.
+5. Download the run's `toonzo-preview-*` artifact and review the videos and subtitles.
 
-## STEP 3 — YouTube API setup — 15 min (sab se lamba step)
+The preview workflow does not need Pexels or YouTube credentials.
 
-1. https://console.cloud.google.com kholein → naya **Project** banayein
-2. **APIs & Services → Library** → "YouTube Data API v3" search kar ke **Enable** karein
-3. **APIs & Services → OAuth consent screen**:
-   - External → App ka koi bhi naam → apni email → Save
-   - **Audience/Test users** mein apni email add karein
-4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**:
-   - Application type: **Desktop app** → Create
-   - **Download JSON** karein, file ka naam `client_secret.json` rakhein
+## 3. YouTube publishing — later, after preview approval
 
-5. Ab apne computer par (Python installed hona chahiye):
-   ```
-   pip install google-auth-oauthlib google-api-python-client
-   ```
-   `client_secret.json` ko is project folder mein rakhein, phir:
-   ```
-   python get_refresh_token.py
-   ```
-   Browser khulega → **apne YouTube channel wale account** se login → Allow.
-   Terminal mein 3 values print hongi:
-   - `YT_CLIENT_ID`
-   - `YT_CLIENT_SECRET`
-   - `YT_REFRESH_TOKEN`
+Do not enable public uploads until the cartoon appearance, scripts, subtitles, audience classification, and permissions have been reviewed. Set the actual YouTube channel name to **ToonZo Official** in YouTube Studio. Upload mode verifies the OAuth account's exact channel name and checks its latest 50 video titles against generated titles. For authorized YouTube uploads, create OAuth credentials locally and generate a refresh token with `get_refresh_token.py`. Never commit the OAuth JSON file.
 
-   Teeno save kar lein.
+When production publishing is intentionally enabled, add these repository Actions secrets:
 
-## STEP 4 — GitHub par lagana — 10 min
+- `YT_CLIENT_ID`
+- `YT_CLIENT_SECRET`
+- `YT_REFRESH_TOKEN`
 
-1. https://github.com par account banayein (agar nahi hai)
-2. **New repository** → naam e.g. `yt-automation` → **Private** rakh sakte hain
-   - Note: Private repo par GitHub Actions ke 2,000 free minutes/month hain.
-     Yeh pipeline roughly 40–60 min/din leta hai, to mahine ke ~1,500–1,800 min —
-     limit ke andar, lekin agar kabhi kam parein to repo **Public** kar dein
-     (public repos par minutes unlimited free hain).
-3. Is poore folder ki files repo mein upload karein
-   (GitHub par "uploading an existing file" se drag & drop bhi ho jata hai —
-   `.github/workflows/daily.yml` ka folder path same rehna zaroori hai)
-4. Repo mein: **Settings → Secrets and variables → Actions → New repository secret**
-   Yeh **5 secrets** banayein:
+Set `UPLOAD_TO_YOUTUBE=true`, choose `YOUTUBE_PRIVACY_STATUS` deliberately, and set `YOUTUBE_MADE_FOR_KIDS` to `true` or `false` according to the actual intended audience. Upload mode refuses to start without that audience decision. Before enabling a daily schedule, verify YouTube API quotas, OAuth access, and GitHub Actions usage.
 
-   | Secret name        | Value                  |
-   |--------------------|------------------------|
-   | `GEMINI_API_KEY`   | Step 1 wali key        |
-   | `PEXELS_API_KEY`   | Step 2 wali key        |
-   | `YT_CLIENT_ID`     | Step 3 wali value      |
-   | `YT_CLIENT_SECRET` | Step 3 wali value      |
-   | `YT_REFRESH_TOKEN` | Step 3 wali value      |
+## Target and schedule
 
-## STEP 5 — Pehla test run
+The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. The daily schedule remains paused until preview review; when enabled, the planned publishing time is 6:30 PM Pakistan time (13:30 UTC).
 
-1. Repo mein **Actions** tab → "Daily YouTube Videos" → **Run workflow**
-2. Logs mein progress dekhein. 1 long video aur 4 Shorts ke `Uploaded` links aur final success summary verify karein.
-3. Pehli dafa `config.py` mein `PRIVACY_STATUS = "private"` rakh kar test karein,
-   videos check karein, phir `"public"` kar dein.
+## Limitations
 
-Bas. Ab roz 6:30 PM PKT par sab khud hoga. ✅
-
----
-
-## Customize karna (sirf `config.py` edit karein)
-
-| Setting | Kya karti hai |
-|---|---|
-| `VOICE` | `ur-PK-UzmaNeural` = female Urdu, `hi-IN-SwaraNeural` = Hindi |
-| `NICHE` | Topics ka subject change karein |
-| `LONG_VIDEOS_PER_DAY` / `SHORTS_PER_DAY` | Videos ki tadaad; defaults 1 long + 4 Shorts hain |
-| `PRIVACY_STATUS` | `private` / `public` |
-| Upload time | `.github/workflows/daily.yml` mein cron (UTC mein hota hai; PKT − 5) |
-
-## Important baatein (zaroor parhein)
-
-- **YouTube quota:** Upload API quota consume karta hai. 1 long + 4 Shorts ke liye apne Google Cloud project ki upload quota check karein; quota limit ho to uploads fail ho sakte hain.
-- **Topic feedback:** Successful video IDs `video_history.json` mein save hote hain. Agle runs public views/day, likes/views aur comments/views ko directional signals ke taur par use karte hain; in se watch time, retention, CTR ya monetization ka pata nahi chalta.
-- **Monetization warning:** YouTube "mass-produced / repetitious" content ko
-  monetization se reject kar sakta hai. Bachne ke liye: thumbnails custom banayein,
-  kabhi kabhi scripts edit karein, aur quality par nazar rakhein. Yeh system content
-  banata hai — channel ki growth strategy phir bhi aap ki hai.
-- **Gemini free tier limits:** Agar kabhi rate limit aaye to script khud 30 sec
-  wait kar ke retry karta hai.
-- **Token expire:** Agar mahino baad upload fail ho "invalid_grant" ke saath,
-  to Step 3.5 dobara chala kar naya refresh token banayein.
-  (OAuth consent screen ko "Testing" se "In production" karne par token
-  expire nahi hota — warna testing mode mein 7 din baad expire ho jata hai.
-  Is liye consent screen ko **Publish/In production** zaroor kar dein.)
-
-## Troubleshooting
-
-| Masla | Hal |
-|---|---|
-| Action fail "Gemini API failed" | Key check karein, ya free tier limit — agle din theek |
-| "Footage nahi mili" | Pexels key check karein |
-| Upload fail 403 | YouTube API enable hai? Consent screen published hai? |
-| Video Urdu nahi bol rahi | `config.py` mein `VOICE` check karein |
+- The current artwork is locally drawn lightweight 2D animation, not AI-generated cinematic animation or lip-sync.
+- Generated content still needs human review; technical checks cannot guarantee copyright clearance or monetization eligibility.
+- Daily runs, API quotas, third-party services, and monetization outcomes are not guaranteed.

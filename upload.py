@@ -1,6 +1,4 @@
-"""
-YouTube upload + upload ke baad auto-comment (engagement ke liye).
-"""
+"""Upload approved video files through the authorized YouTube Data API."""
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -35,6 +33,37 @@ def get_video_statistics(video_ids: list) -> dict:
     return statistics
 
 
+def get_channel_identity_and_recent_titles() -> tuple[str, list[str]]:
+    """Return the authorized channel title and its latest uploaded video titles."""
+    yt = _youtube()
+    response = yt.channels().list(
+        part="snippet,contentDetails", mine=True
+    ).execute()
+    channels = response.get("items", [])
+    if not channels:
+        raise RuntimeError("YouTube OAuth did not return an authorized channel")
+
+    channel = channels[0]
+    channel_title = channel.get("snippet", {}).get("title", "")
+    uploads_playlist = (
+        channel.get("contentDetails", {})
+        .get("relatedPlaylists", {})
+        .get("uploads")
+    )
+    if not uploads_playlist:
+        raise RuntimeError("Could not find the authorized channel's uploads playlist")
+
+    playlist = yt.playlistItems().list(
+        part="snippet", playlistId=uploads_playlist, maxResults=50
+    ).execute()
+    titles = [
+        item.get("snippet", {}).get("title", "")
+        for item in playlist.get("items", [])
+        if item.get("snippet", {}).get("title")
+    ]
+    return channel_title, titles
+
+
 def upload_video(path: str, title: str, description: str, tags: list) -> str:
     yt = _youtube()
     body = {
@@ -48,7 +77,7 @@ def upload_video(path: str, title: str, description: str, tags: list) -> str:
         },
         "status": {
             "privacyStatus": config.PRIVACY_STATUS,
-            "selfDeclaredMadeForKids": False,
+            "selfDeclaredMadeForKids": config.YOUTUBE_MADE_FOR_KIDS == "true",
         },
     }
     media = MediaFileUpload(path, chunksize=8 * 1024 * 1024, resumable=True)

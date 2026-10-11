@@ -5,13 +5,12 @@ import os
 
 # ---------- API KEYS ----------
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 YT_CLIENT_ID = os.environ.get("YT_CLIENT_ID", "")
 YT_CLIENT_SECRET = os.environ.get("YT_CLIENT_SECRET", "")
 YT_REFRESH_TOKEN = os.environ.get("YT_REFRESH_TOKEN", "")
 
 # ---------- CONTENT ----------
-NICHE = "mind-blowing science facts, shocking history, space mysteries, human psychology, world records, animal kingdom, viral facts, dark history, FIFA World Cup 2026"
+NICHE = "original, family-friendly 2D cartoon adventures featuring ToonZo's recurring characters"
 LANGUAGE = "English"
 LONG_VIDEOS_PER_DAY = 1
 SHORTS_PER_DAY = 4
@@ -28,9 +27,11 @@ SHORT_RESOLUTION = (1080, 1920)
 FPS = 24
 
 # ---------- UPLOAD ----------
-UPLOAD_TO_YOUTUBE = True
-PRIVACY_STATUS = "public"
-CATEGORY_ID = "27"
+UPLOAD_TO_YOUTUBE = os.environ.get("UPLOAD_TO_YOUTUBE", "false").lower() == "true"
+PRIVACY_STATUS = os.environ.get("YOUTUBE_PRIVACY_STATUS", "private")
+YOUTUBE_MADE_FOR_KIDS = os.environ.get("YOUTUBE_MADE_FOR_KIDS", "").lower()
+CATEGORY_ID = "1"
+CHANNEL_NAME = "ToonZo Official"
 
 # ---------- MODELS ----------
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -43,3 +44,4 @@ GEMINI_URL = (
 WORK_DIR = "output"
 USED_TOPICS_FILE = "used_topics.json"
 VIDEO_HISTORY_FILE = "video_history.json"
+CONTENT_HISTORY_FILE = "content_history.json"

@@ -14,7 +14,7 @@ from moviepy import (
 )
 import config
 
-CHANNEL_NAME = "FactsBaaz17"
+CHANNEL_NAME = config.CHANNEL_NAME
 MUSIC_VOLUME = 0.10
 
 FONT_PATHS = [

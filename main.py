@@ -1,18 +1,19 @@
 """
-Main pipeline — roz GitHub Actions chalata hai.
-Flow: topics -> scripts -> voiceover -> footage -> render -> upload
+ToonZo cartoon production pipeline.
+Flow: story ideas -> scene scripts -> voiceover -> 2D animation -> optional upload
 """
 import json
+import hashlib
 import os
-import shutil
+import re
 import traceback
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 
 import config
 import script_gen
 import tts
-import footage
-import render
+import cartoon
 
 if config.UPLOAD_TO_YOUTUBE:
     import upload
@@ -40,6 +41,75 @@ def load_video_history() -> list:
 def save_video_history(history: list):
     with open(config.VIDEO_HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=1)
+
+
+def load_content_history() -> list:
+    if os.path.exists(config.CONTENT_HISTORY_FILE):
+        with open(config.CONTENT_HISTORY_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def save_content_history(history: list):
+    with open(config.CONTENT_HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=1)
+
+
+def normalize_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def _is_duplicate_title(title: str, content_history: list) -> bool:
+    candidate = normalize_text(title)
+    candidate_words = set(candidate.split())
+    for item in content_history:
+        previous_title = item.get("title", "")
+        if not isinstance(previous_title, str):
+            continue
+        previous = normalize_text(previous_title)
+        previous_words = set(previous.split())
+        shared_words = candidate_words & previous_words
+        union_words = candidate_words | previous_words
+        if previous and (
+            candidate == previous
+            or SequenceMatcher(None, candidate, previous).ratio() >= 0.92
+            or (union_words and len(shared_words) / len(union_words) >= 0.8)
+        ):
+            return True
+    return False
+
+
+def _script_fingerprint(script: str) -> str:
+    normalized = normalize_text(script)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def generate_unique_topics(count: int, kind: str, used: list,
+                           performance: dict, additional_topics: list = None) -> list:
+    selected = []
+    seen = {normalize_text(topic) for topic in used}
+    seen.update(normalize_text(topic) for topic in (additional_topics or []))
+    for _ in range(4):
+        if len(selected) == count:
+            break
+        candidates = script_gen.generate_topics(
+            count - len(selected),
+            kind,
+            used + (additional_topics or []) + selected,
+            performance,
+        )
+        for topic in candidates:
+            normalized = normalize_text(topic)
+            if normalized and normalized not in seen:
+                selected.append(topic)
+                seen.add(normalized)
+                if len(selected) == count:
+                    break
+    if len(selected) != count:
+        raise RuntimeError(
+            f"Could not generate {count} unique {kind} topics after 4 attempts"
+        )
+    return selected
 
 
 def get_topic_performance(history: list) -> dict:
@@ -81,14 +151,34 @@ def get_topic_performance(history: list) -> dict:
     }
 
 
-def make_one(topic: str, kind: str, idx: int, history: list) -> bool:
+def make_one(topic: str, kind: str, idx: int, history: list,
+             content_history: list) -> bool:
     workdir = os.path.join(config.WORK_DIR, f"{kind}_{idx}")
     os.makedirs(workdir, exist_ok=True)
     try:
         print(f"\n=== [{kind} #{idx}] {topic} ===")
 
-        print("1) Script generate ho raha hai...")
-        pkg = script_gen.generate_script(topic, kind)
+        print("1) Unique cartoon script aur title generate ho rahe hain...")
+        pkg = None
+        fingerprint = ""
+        previous_titles = [item.get("title", "") for item in content_history]
+        for attempt in range(3):
+            candidate = script_gen.generate_script(topic, kind, previous_titles)
+            candidate_fingerprint = _script_fingerprint(candidate["script"])
+            if (
+                not _is_duplicate_title(candidate["title"], content_history)
+                and all(
+                    item.get("script_sha256") != candidate_fingerprint
+                    for item in content_history
+                )
+            ):
+                pkg = candidate
+                fingerprint = candidate_fingerprint
+                break
+            print(f"  Duplicate title or script; retrying ({attempt + 1}/3)...")
+            previous_titles.append(candidate["title"])
+        if pkg is None:
+            raise RuntimeError("Could not produce a unique title and script after 3 attempts")
         hook_text = pkg.get("hook_text", topic.upper()[:40])
 
         print("2) Voiceover ban raha hai (edge-tts)...")
@@ -96,43 +186,40 @@ def make_one(topic: str, kind: str, idx: int, history: list) -> bool:
             pkg["script"], os.path.join(workdir, "voice.mp3")
         )
 
-        print("3) Footage download ho rahi hai (Pexels)...")
-        need = 10 if kind == "long" else 4
-        clips = footage.download_clips(
-            pkg["keywords"], kind, os.path.join(workdir, "clips"), need
-        )
-        if not clips:
-            clips = footage.download_clips(
-                ["nature", "space", "ocean"], kind,
-                os.path.join(workdir, "clips"), need
-            )
-        if not clips:
-            raise RuntimeError("Footage nahi mili")
-
-        print("4) Video render ho rahi hai...")
-        out = render.render_video(
-            clips, audio, pkg["title"], kind,
+        print("3) Original 2D cartoon scenes render ho rahe hain...")
+        out = cartoon.render_video(
+            pkg["scenes"], audio, pkg["title"], kind,
             os.path.join(workdir, "final.mp4"),
             hook_text=hook_text
         )
 
         if config.UPLOAD_TO_YOUTUBE:
-            print("5) YouTube par upload ho rahi hai...")
+            print("4) YouTube par upload ho rahi hai...")
             desc = pkg["description"]
+            if "toonzo official" not in desc.lower():
+                desc = f"ToonZo Official presents: {desc}"
             if kind == "short" and "#shorts" not in desc.lower():
                 desc += "\n#Shorts"
             video_id = upload.upload_video(out, pkg["title"], desc, pkg.get("tags", []))
-            shutil.rmtree(workdir, ignore_errors=True)
-        else:
-            print(f"  (Test mode) Video saved: {out}")
-        if config.UPLOAD_TO_YOUTUBE:
             history.append({
                 "topic": topic,
+                "title": pkg["title"],
                 "kind": kind,
                 "video_id": video_id,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(),
             })
             save_video_history(history)
+        else:
+            print(f"  (Preview mode) Video saved: {out}")
+        content_history.append({
+            "topic": topic,
+            "title": pkg["title"],
+            "script_sha256": fingerprint,
+            "kind": kind,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "video_id": video_id if config.UPLOAD_TO_YOUTUBE else None,
+        })
+        save_content_history(content_history)
         return True
 
     except Exception:
@@ -145,13 +232,27 @@ def main():
     os.makedirs(config.WORK_DIR, exist_ok=True)
     used = load_used()
     history = load_video_history()
+    content_history = load_content_history()
+    used.extend(
+        item["topic"] for item in content_history
+        if item.get("topic") and item["topic"] not in used
+    )
+    used.extend(
+        item["topic"] for item in history
+        if item.get("topic") and item["topic"] not in used
+    )
     ok = fail = 0
 
-    missing = [
-        name for name in ("GEMINI_API_KEY", "PEXELS_API_KEY")
-        if not getattr(config, name)
-    ]
+    missing = [name for name in ("GEMINI_API_KEY",) if not getattr(config, name)]
     if config.UPLOAD_TO_YOUTUBE:
+        if config.PRIVACY_STATUS not in {"private", "unlisted", "public"}:
+            raise RuntimeError(
+                "YOUTUBE_PRIVACY_STATUS must be private, unlisted, or public"
+            )
+        if config.YOUTUBE_MADE_FOR_KIDS not in {"true", "false"}:
+            raise RuntimeError(
+                "Set YOUTUBE_MADE_FOR_KIDS to true or false based on the channel's actual audience"
+            )
         missing.extend(
             name for name in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN")
             if not getattr(config, name)
@@ -159,15 +260,28 @@ def main():
     if missing:
         raise RuntimeError("Missing required environment secrets: " + ", ".join(missing))
 
+    if config.UPLOAD_TO_YOUTUBE:
+        channel_title, recent_titles = upload.get_channel_identity_and_recent_titles()
+        if channel_title != config.CHANNEL_NAME:
+            raise RuntimeError(
+                f"Authorized YouTube channel is {channel_title!r}; "
+                f"expected {config.CHANNEL_NAME!r}. No videos were uploaded."
+            )
+        content_history.extend({"title": title} for title in recent_titles)
+
     performance = get_topic_performance(history) if config.UPLOAD_TO_YOUTUBE else {}
-    print("Aaj ke topics generate ho rahe hain...")
-    long_topics = script_gen.generate_topics(config.LONG_VIDEOS_PER_DAY, "long", used, performance)
-    short_topics = script_gen.generate_topics(config.SHORTS_PER_DAY, "short", used, performance)
+    print("ToonZo ke original cartoon ideas generate ho rahe hain...")
+    long_topics = generate_unique_topics(
+        config.LONG_VIDEOS_PER_DAY, "long", used, performance
+    )
+    short_topics = generate_unique_topics(
+        config.SHORTS_PER_DAY, "short", used, performance, long_topics
+    )
     print("Long :", long_topics)
     print("Short:", short_topics)
 
     for i, t in enumerate(long_topics, 1):
-        if make_one(t, "long", i, history):
+        if make_one(t, "long", i, history, content_history):
             ok += 1
             used.append(t)
         else:
@@ -175,7 +289,7 @@ def main():
         save_used(used)
 
     for i, t in enumerate(short_topics, 1):
-        if make_one(t, "short", i, history):
+        if make_one(t, "short", i, history, content_history):
             ok += 1
             used.append(t)
         else:
