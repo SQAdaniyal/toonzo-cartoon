@@ -1,6 +1,9 @@
-name: ToonZo Cartoon Preview
+name: ToonZo Daily Cartoons
 
 on:
+  schedule:
+    # 6:30 PM Pakistan time (13:30 UTC). GitHub schedule timing is best-effort.
+    - cron: "30 13 * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,14 +30,19 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt
 
-      - name: Render cartoon previews
+      - name: Generate cartoons (scheduled upload, manual preview)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          UPLOAD_TO_YOUTUBE: "false"
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          UPLOAD_TO_YOUTUBE: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
+          YOUTUBE_PRIVACY_STATUS: public
+          YOUTUBE_MADE_FOR_KIDS: "true"
         run: python main.py
 
-      - name: Save rendered previews for review
-        if: always()
+      - name: Save manual preview videos for review
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: toonzo-preview-${{ github.run_number }}

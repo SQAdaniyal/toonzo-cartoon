@@ -2,7 +2,7 @@
 
 ## Current workflow status
 
-The GitHub Action currently runs **manually for preview only**. It does not schedule uploads and YouTube upload is disabled by default. The target is configured to render one long video and four Shorts per run, using original Milo-and-Tilly 2D scenes.
+The GitHub Action is configured to schedule **one long video and four Shorts daily**, targeting 6:30 PM Pakistan time (13:30 UTC). Scheduled runs publish publicly and mark videos Made for Kids, as selected by the channel owner. Manual **Run workflow** runs remain preview-only and do not upload. GitHub's schedule is best-effort and may start late.
 
 ## 1. Install locally
 
@@ -28,26 +28,26 @@ The output MP4 and SRT files are created in `output/`.
 1. Revoke and replace any API key that was shared in chat.
 2. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
 3. Add `GEMINI_API_KEY` with the rotated key.
-4. Open **Actions → ToonZo Cartoon Preview → Run workflow**.
+4. Open **Actions → ToonZo Daily Cartoons → Run workflow**.
 5. Download the run's `toonzo-preview-*` artifact and review the videos and subtitles.
 
-The preview workflow does not need Pexels or YouTube credentials.
+Manual preview runs do not upload and do not need YouTube credentials. Scheduled runs do require the three YouTube secrets below.
 
-## 3. YouTube publishing — later, after preview approval
+## 3. Scheduled YouTube publishing
 
-Do not enable public uploads until the cartoon appearance, scripts, subtitles, audience classification, and permissions have been reviewed. Set the actual YouTube channel name to **ToonZo Official** in YouTube Studio. Upload mode verifies the OAuth account's exact channel name and checks its latest 50 video titles against generated titles. For authorized YouTube uploads, create OAuth credentials locally and generate a refresh token with `get_refresh_token.py`; the script saves the token under the ignored `local_secrets/` folder rather than printing the credential. Never commit the OAuth JSON or token file.
+Scheduled uploads are public, so review a manual preview before the first scheduled run if you have not already done so. Set the actual YouTube channel name to **ToonZo Official** in YouTube Studio. Upload mode verifies the OAuth account's exact channel name and checks its latest 50 video titles and saved history before uploading. For authorized YouTube uploads, create OAuth credentials locally and generate a refresh token with `get_refresh_token.py`; the script saves the token under the ignored `local_secrets/` folder rather than printing the credential. Never commit the OAuth JSON or token file.
 
-When production publishing is intentionally enabled, add these repository Actions secrets:
+For scheduled YouTube publishing, these repository Actions secrets are required:
 
 - `YT_CLIENT_ID`
 - `YT_CLIENT_SECRET`
 - `YT_REFRESH_TOKEN`
 
-Set `UPLOAD_TO_YOUTUBE=true`, choose `YOUTUBE_PRIVACY_STATUS` deliberately, and set `YOUTUBE_MADE_FOR_KIDS` to `true` or `false` according to the actual intended audience. Upload mode refuses to start without that audience decision. Before enabling a daily schedule, verify YouTube API quotas, OAuth access, and GitHub Actions usage.
+Scheduled runs are configured for public visibility and Made for Kids. The OAuth-authorized channel must be named exactly **ToonZo Official** or the pipeline stops before generating/uploading. Ensure the actual channel name in YouTube Studio is correct. YouTube API quota, OAuth access and account permissions can still prevent uploads.
 
 ## Target and schedule
 
-The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. The daily schedule remains paused until preview review; when enabled, the planned publishing time is 6:30 PM Pakistan time (13:30 UTC).
+The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. GitHub-hosted standard runners are free for this public repository; GitHub schedule timing is best-effort.
 
 ## Limitations
 

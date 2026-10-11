@@ -5,9 +5,10 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 ## Current status
 
 - Configured production target: **1 long video and 4 Shorts per run**.
-- The GitHub Action is **manual preview only**; scheduled publishing is paused until cartoon previews are reviewed.
-- YouTube upload is disabled by default. No credential is required to render a preview; only `GEMINI_API_KEY` is needed.
-- The preview action saves MP4 and SRT files as a 7-day Actions artifact.
+- Scheduled GitHub Action runs target **1 long cartoon + 4 Shorts daily**, and upload them publicly at 6:30 PM Pakistan time. GitHub schedule timing is best-effort.
+- Clicking **Run workflow** manually remains preview-only; it does not upload to YouTube.
+- Local runs and manual workflow dispatch default to preview-only. Only `GEMINI_API_KEY` is needed to render a preview.
+- Manual preview runs save MP4 and SRT files as a 7-day Actions artifact. Scheduled uploads do not retain large video artifacts.
 - Frames are branded **ToonZo Official**. Upload mode verifies the authorized channel title is exactly `ToonZo Official` and checks recent YouTube titles plus saved topic, title, and script history before uploading.
 - This is a lightweight 2D animation MVP, not a full generative-image or character lip-sync system.
 
@@ -18,7 +19,7 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 3. Draw original vector-like cartoon scenes locally with Pillow.
 4. Add subtle character motion, story captions, and SRT subtitles.
 5. Render horizontal long videos and vertical Shorts with MoviePy/FFmpeg.
-6. Review the generated artifact before enabling any publishing.
+6. Manual workflow runs create review artifacts; scheduled runs publish the generated videos automatically.
 
 ## Run locally
 
@@ -37,7 +38,7 @@ python main.py
 
 Generated videos and subtitles are saved under `output/`.
 
-## GitHub preview setup
+## GitHub Actions setup
 
 Add a rotated `GEMINI_API_KEY` under **Settings → Secrets and variables → Actions**. Run **Actions → ToonZo Cartoon Preview → Run workflow**, then download the resulting preview artifact.
 
@@ -45,17 +46,15 @@ Do not add API keys or OAuth JSON files to the repository. Any keys shared in ch
 
 ## Daily publishing
 
-Daily scheduling is intentionally paused while the cartoon output is reviewed. When enabling production later, set `UPLOAD_TO_YOUTUBE=true` only after preview approval and add these GitHub Actions secrets:
-
 - `YT_CLIENT_ID`
 - `YT_CLIENT_SECRET`
 - `YT_REFRESH_TOKEN`
 
-Set the intended `YOUTUBE_PRIVACY_STATUS` deliberately (`private` for a final test, then `public` when ready), and set `YOUTUBE_MADE_FOR_KIDS` accurately to `true` or `false`; upload mode refuses to run if the audience designation is omitted. Rename the actual YouTube channel to **ToonZo Official** in YouTube Studio first; the uploader checks the authorized channel name but does not rename it. GitHub secrets must be entered by the repository owner; this project does not upload credentials. The requested target is already configurable as 1 long video and 4 Shorts in [config.py](./config.py).
+The scheduled job uses public visibility and `Made for Kids = true`, as selected by the channel owner. It uploads only if the OAuth-authorized channel name is exactly **ToonZo Official**; rename the actual channel in YouTube Studio first if needed. The daily target is configurable as 1 long video and 4 Shorts in [config.py](./config.py).
 
 ## Important
 
-YouTube API quotas, OAuth permissions, account eligibility, content suitability, and monetization approval are controlled by YouTube and cannot be guaranteed by this project. Human review is required for copyright, audience classification, and public release decisions.
+The repo is public, so standard GitHub-hosted Actions runners are used without private-repository minute overage. Scheduled runs still depend on Actions availability, valid secrets, YouTube quota/OAuth permissions, and platform policies; uploads can fail and are not guaranteed. Review the first generated videos after the first run. Monetization approval is not guaranteed.
 
 ## License
 
