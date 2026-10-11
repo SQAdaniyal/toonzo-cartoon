@@ -73,6 +73,7 @@ class CartoonPipelineTests(unittest.TestCase):
                 side_effect=[
                     Mock(status_code=503, text="temporarily unavailable"),
                     Mock(status_code=503, text="temporarily unavailable"),
+                    Mock(status_code=503, text="temporarily unavailable"),
                     successful_response,
                 ],
             ) as post,
@@ -81,12 +82,13 @@ class CartoonPipelineTests(unittest.TestCase):
             result = script_gen._ask_gemini("prompt")
 
         self.assertEqual(result, '{"title":"A New Kite"}')
-        self.assertEqual(post.call_count, 3)
+        self.assertEqual(post.call_count, 4)
         self.assertIn(script_gen.MODELS[0], post.call_args_list[0].args[0])
         self.assertIn(script_gen.MODELS[0], post.call_args_list[1].args[0])
-        self.assertIn(script_gen.MODELS[1], post.call_args_list[2].args[0])
+        self.assertIn(script_gen.MODELS[0], post.call_args_list[2].args[0])
+        self.assertIn(script_gen.MODELS[1], post.call_args_list[3].args[0])
         self.assertEqual(
-            post.call_args_list[2].kwargs["json"]["generationConfig"]["responseMimeType"],
+            post.call_args_list[3].kwargs["json"]["generationConfig"]["responseMimeType"],
             "application/json",
         )
 

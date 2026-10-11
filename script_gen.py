@@ -1,5 +1,6 @@
 """Generate original ToonZo story ideas and scene-by-scene cartoon scripts."""
 import json
+import random
 import re
 import time
 import requests
@@ -11,7 +12,7 @@ BASE = "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateCont
 
 def _ask_gemini(prompt: str) -> str:
     for model in MODELS:
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 r = requests.post(
                     BASE.format(m=model),
@@ -47,14 +48,14 @@ def _ask_gemini(prompt: str) -> str:
                         )
                     return text
                 print(f"  [{model}] HTTP {r.status_code}: {r.text[:200]}", flush=True)
-                if r.status_code in (429, 500, 502, 503, 504) and attempt == 0:
-                    time.sleep(5)
+                if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                    time.sleep(min(15 * (2**attempt), 60) + random.uniform(0, 3))
                     continue
                 break
             except (requests.RequestException, ValueError, KeyError) as e:
                 print(f"  [{model}] error (attempt {attempt+1}): {e}", flush=True)
-                if attempt == 0:
-                    time.sleep(5)
+                if attempt < 2:
+                    time.sleep(min(15 * (2**attempt), 60) + random.uniform(0, 3))
         print(f"  [{model}] fail — next model...", flush=True)
     raise RuntimeError("Gemini API failed (all models tried)")
 
