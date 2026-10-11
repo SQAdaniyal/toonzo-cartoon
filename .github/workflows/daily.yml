@@ -64,7 +64,22 @@ jobs:
           done
           if ! git diff --cached --quiet; then
             git commit -m "Save ToonZo content history [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              git fetch origin \
+                "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/$GITHUB_REF_NAME"
+              if ! git rebase "origin/$GITHUB_REF_NAME"; then
+                git rebase --abort
+                echo "Could not rebase content history onto the latest branch."
+                exit 1
+              fi
+              if git push origin "HEAD:$GITHUB_REF_NAME"; then
+                exit 0
+              fi
+              echo "History push attempt $attempt failed; retrying."
+              sleep 2
+            done
+            echo "Could not push content history after 3 attempts."
+            exit 1
           else
             echo "No content history changes to save."
           fi
