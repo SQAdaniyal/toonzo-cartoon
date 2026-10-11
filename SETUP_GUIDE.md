@@ -47,6 +47,8 @@ All GitHub workflow runs are configured for public visibility and Made for Kids.
 
 The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. The daily schedule starts at 3:00 AM Pakistan time to try a different API-demand window; Google does not guarantee that this time has lower demand. GitHub-hosted standard runners are free for this public repository; GitHub schedule timing is best-effort.
 
+If Gemini reports exhausted quota or all configured models are unavailable, the pipeline stops calling blocked models and uses original local story templates for the remaining content. This keeps the run independent of further Gemini quota, but fallback stories are simpler and less varied. YouTube, OAuth, Actions availability, and API permissions can still prevent a successful upload.
+
 ## Limitations
 
 - The current artwork is locally drawn lightweight 2D animation, not AI-generated cinematic animation or lip-sync.

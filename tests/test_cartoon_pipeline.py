@@ -57,6 +57,104 @@ class CartoonPipelineTests(unittest.TestCase):
         self.assertEqual(ask.call_args_list[0].args, ("prompt", 0))
         self.assertEqual(ask.call_args_list[1].args[1], 1)
 
+    def test_local_topics_are_unique_and_skip_used_ideas(self):
+        with patch(
+            "script_gen._generate_json",
+            side_effect=RuntimeError("Gemini quota exhausted"),
+        ):
+            topics = script_gen.generate_topics(
+                5, "short", ["A paper kite that has drifted into a patch of tall grass in the sunny meadow"]
+            )
+
+        self.assertEqual(len(topics), 5)
+        self.assertEqual(len(set(topics)), 5)
+        self.assertNotIn(
+            "A paper kite that has drifted into a patch of tall grass in the sunny meadow",
+            topics,
+        )
+
+    def test_local_script_fallback_produces_valid_short_package(self):
+        with patch(
+            "script_gen._generate_json",
+            side_effect=RuntimeError("Gemini quota exhausted"),
+        ):
+            package = script_gen.generate_script(
+                "A paper kite that has drifted into a patch of tall grass in the sunny meadow",
+                "short",
+            )
+
+        self.assertEqual(len(package["scenes"]), 5)
+        self.assertEqual(
+            package["script"],
+            " ".join(scene["narration"] for scene in package["scenes"]),
+        )
+        self.assertLessEqual(
+            len(package["script"].split()), config.SHORT_TARGET_WORDS
+        )
+        self.assertTrue(package["title"].endswith("#Shorts"))
+
+    def test_local_script_fallback_produces_long_episode_length(self):
+        with patch(
+            "script_gen._generate_json",
+            side_effect=RuntimeError("Gemini quota exhausted"),
+        ):
+            package = script_gen.generate_script(
+                "A paper kite that has drifted into a patch of tall grass in the sunny meadow",
+                "long",
+            )
+
+        self.assertGreaterEqual(len(package["scenes"]), 8)
+        self.assertLessEqual(len(package["scenes"]), 12)
+        self.assertGreaterEqual(len(package["script"].split()), config.LONG_TARGET_WORDS)
+        self.assertEqual(
+            package["script"],
+            " ".join(scene["narration"] for scene in package["scenes"]),
+        )
+
+    def test_quota_exhaustion_skips_retries_for_that_model(self):
+        script_gen._QUOTA_BLOCKED_MODELS.clear()
+        script_gen._UNAVAILABLE_MODELS.clear()
+        quota_response = Mock(
+            status_code=429,
+            text='{"error":{"message":"You exceeded your current quota"}}',
+        )
+        try:
+            with patch(
+                "script_gen.requests.post",
+                side_effect=[quota_response, quota_response, quota_response],
+            ) as post:
+                with self.assertRaises(RuntimeError):
+                    script_gen._ask_gemini("prompt")
+                self.assertEqual(post.call_count, len(script_gen.MODELS))
+                with self.assertRaises(RuntimeError):
+                    script_gen._ask_gemini("prompt")
+                self.assertEqual(post.call_count, len(script_gen.MODELS))
+        finally:
+            script_gen._QUOTA_BLOCKED_MODELS.clear()
+            script_gen._UNAVAILABLE_MODELS.clear()
+
+    def test_unavailable_models_are_not_retried_for_every_video(self):
+        script_gen._QUOTA_BLOCKED_MODELS.clear()
+        script_gen._UNAVAILABLE_MODELS.clear()
+        unavailable = Mock(status_code=503, text="temporarily unavailable")
+        try:
+            with (
+                patch(
+                    "script_gen.requests.post",
+                    side_effect=[unavailable] * (len(script_gen.MODELS) * 3),
+                ) as post,
+                patch("script_gen.time.sleep"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    script_gen._ask_gemini("first prompt")
+                self.assertEqual(post.call_count, len(script_gen.MODELS) * 3)
+                with self.assertRaises(RuntimeError):
+                    script_gen._ask_gemini("next prompt")
+                self.assertEqual(post.call_count, len(script_gen.MODELS) * 3)
+        finally:
+            script_gen._QUOTA_BLOCKED_MODELS.clear()
+            script_gen._UNAVAILABLE_MODELS.clear()
+
     def test_gemini_switches_models_after_unavailable_response(self):
         successful_response = Mock(
             status_code=200,

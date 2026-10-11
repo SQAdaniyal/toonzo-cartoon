@@ -8,6 +8,7 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 - Scheduled GitHub Action runs target **1 long cartoon + 4 Shorts daily**, and upload them publicly, starting at 3:00 AM Pakistan time. The overnight time is a trial to avoid peak demand; Gemini availability is not guaranteed. GitHub schedule timing is best-effort.
 - Clicking **Run workflow** manually also publishes the generated videos publicly. Each run can upload up to five videos; avoid starting extra runs if you only want the daily batch.
 - Local runs default to preview-only. Only `GEMINI_API_KEY` is needed for a local preview; Actions uploads also require the YouTube secrets below.
+- If Gemini's free quota is exhausted or all configured models are unavailable, the pipeline switches to original local story templates so a run can continue without more Gemini requests. These fallback episodes are simpler and less varied than AI-generated scripts.
 - Frames are branded **ToonZo Official**. Upload mode verifies the authorized channel title is exactly `ToonZo Official` and checks recent YouTube titles plus saved topic, title, and script history before uploading.
 - This is a lightweight 2D animation MVP, not a full generative-image or character lip-sync system.
 

@@ -8,11 +8,52 @@ import config
 
 MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
 BASE = "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
+_QUOTA_BLOCKED_MODELS = set()
+_UNAVAILABLE_MODELS = set()
+
+_LOCAL_OBJECTS = (
+    "a paper kite",
+    "a tiny toy boat",
+    "a bright red apple",
+    "a shiny soap bubble",
+    "a little blue backpack",
+    "a wooden music box",
+    "a striped garden umbrella",
+    "a round pumpkin",
+    "a colorful pinwheel",
+    "a small basket of berries",
+    "a friendly ladybug",
+    "a soft yellow scarf",
+)
+_LOCAL_EVENTS = (
+    "has drifted into a patch of tall grass",
+    "keeps rolling toward a shallow stream",
+    "is bobbing gently across a puddle",
+    "has become tangled in a low branch",
+    "is making a funny echo in the meadow",
+    "is hiding beneath a pile of autumn leaves",
+    "keeps spinning whenever the breeze returns",
+    "has landed beside a sleepy field mouse",
+    "is surrounded by a trail of sparkling dew",
+    "is wobbling along a quiet garden path",
+    "has slipped just out of easy reach",
+    "is blocking the path to a patch of flowers",
+)
+_LOCAL_PLACES = (
+    "the sunny meadow",
+    "the little garden",
+    "the clover field",
+    "the edge of the pond",
+    "the woodland path",
+    "the hilltop",
+)
 
 
 def _ask_gemini(prompt: str, starting_model: int = 0) -> str:
     model_order = MODELS[starting_model:] + MODELS[:starting_model]
     for model in model_order:
+        if model in _QUOTA_BLOCKED_MODELS or model in _UNAVAILABLE_MODELS:
+            continue
         for attempt in range(3):
             try:
                 r = requests.post(
@@ -48,7 +89,16 @@ def _ask_gemini(prompt: str, starting_model: int = 0) -> str:
                             f"Gemini returned no text (finish reason: {finish_reason})"
                         )
                     return text
-                print(f"  [{model}] HTTP {r.status_code}: {r.text[:200]}", flush=True)
+                response_text = r.text[:200]
+                quota_exhausted = (
+                    r.status_code == 429
+                    and "exceeded your current quota" in response_text.lower()
+                )
+                print(f"  [{model}] HTTP {r.status_code}: {response_text}", flush=True)
+                if quota_exhausted:
+                    _QUOTA_BLOCKED_MODELS.add(model)
+                    _UNAVAILABLE_MODELS.add(model)
+                    break
                 if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
                     time.sleep(min(15 * (2**attempt), 60) + random.uniform(0, 3))
                     continue
@@ -57,8 +107,90 @@ def _ask_gemini(prompt: str, starting_model: int = 0) -> str:
                 print(f"  [{model}] error (attempt {attempt+1}): {e}", flush=True)
                 if attempt < 2:
                     time.sleep(min(15 * (2**attempt), 60) + random.uniform(0, 3))
+        _UNAVAILABLE_MODELS.add(model)
         print(f"  [{model}] fail — next model...", flush=True)
     raise RuntimeError("Gemini API failed (all models tried)")
+
+
+def _local_topics(count: int, used: list) -> list:
+    candidates = [
+        f"{obj.capitalize()} that {event} in {place}"
+        for obj in _LOCAL_OBJECTS
+        for event in _LOCAL_EVENTS
+        for place in _LOCAL_PLACES
+    ]
+    used_normalized = {
+        re.sub(r"[^a-z0-9]+", " ", item.casefold()).strip()
+        for item in used
+        if isinstance(item, str)
+    }
+    random.shuffle(candidates)
+    topics = [
+        topic for topic in candidates
+        if re.sub(r"[^a-z0-9]+", " ", topic.casefold()).strip() not in used_normalized
+    ][:count]
+    if len(topics) != count:
+        raise RuntimeError(
+            f"Local fallback has only {len(topics)} unused topics; needs {count}"
+        )
+    return topics
+
+
+def _local_script(topic: str, kind: str) -> dict:
+    object_phrase = topic.split(" that ", 1)[0]
+    item = object_phrase[0].lower() + object_phrase[1:]
+    if kind == "short":
+        narrations = [
+            f"One bright morning, Milo spotted {item} nearby and called, 'Tilly, come and see!'",
+            "A gentle breeze nudged it farther away, and Milo hurried after it without a plan.",
+            "Tilly watched carefully and said, 'Let's slow down and think of a safe way to help.'",
+            "Milo held the path clear while Tilly carefully guided it back to a safe spot.",
+            "Together they solved the little problem, shared a happy laugh, and celebrated as friends.",
+        ]
+    else:
+        narrations = [
+            f"One bright morning, Milo spotted {item} near the meadow path. 'Tilly, look!' he called, his curious ears lifting as he hurried over to investigate. Sunlight shimmered on the grass, and the friends wondered how it had arrived there as birds sang nearby.",
+            "Tilly joined him and looked at the small surprise from a safe distance. The friends could see it needed help, but rushing might make the problem harder. They listened to the breeze and watched carefully before taking another step, then made a little plan.",
+            "Milo tried to fix everything quickly. He stepped this way and that, but the surprise only moved farther away, and his first plan did not work. He nearly tried again, then noticed Tilly waiting calmly beside the path without disturbing the flowers.",
+            "He stopped, took a breath, and listened as Tilly gently reminded him that careful thinking can be more useful than rushing ahead. Milo nodded, feeling proud that he could pause, learn, and try a kinder plan with a thoughtful little smile.",
+            "Tilly studied the ground and noticed a clear, gentle route nearby. She explained her idea while Milo gathered a few soft leaves to keep the path tidy. Together they checked that there was room for everyone to move safely before they started together.",
+            "Together they followed the plan one small step at a time. Milo stayed patient, and Tilly guided the surprise away from the tricky spot. They encouraged each other whenever it wobbled, and slowly their teamwork began to help with plenty of room to move.",
+            "For a moment it wobbled again. The friends paused, checked that everything was safe, and adjusted their plan instead of giving up. Milo held still while Tilly showed him the best direction to try next, and they tried their gentle idea.",
+            "Milo held the way open while Tilly carefully helped. At last the surprise reached a calm place where it could rest without trouble. The two friends smiled when they saw that their gentle plan had worked near a shady patch of clover.",
+            "The meadow felt peaceful again. Milo and Tilly smiled at their teamwork and noticed how much easier the problem felt once they worked together. They thanked each other for listening, being patient, and sharing the helpful idea under the warm afternoon sun.",
+            "They waved goodbye to their little adventure and headed home as the sun warmed the path. Milo promised to pause and think next time, and Tilly laughed. Thanks for joining Milo and Tilly; see you next time, ready for another kind adventure!",
+        ]
+
+    scenes = [
+        {
+            "narration": narration,
+            "setting": "sunny meadow",
+            "action": item,
+            "mood": mood,
+        }
+        for narration, mood in zip(
+            narrations,
+            ("curious", "worried", "surprised", "curious", "happy",
+             "excited", "worried", "happy", "happy", "happy"),
+        )
+    ]
+    script = " ".join(scene["narration"] for scene in scenes)
+    title = " ".join(word.capitalize() for word in topic.split())
+    if kind == "short":
+        title = f"{title[:60].rstrip()} #Shorts"
+    return {
+        "hook_text": "A MEADOW SURPRISE",
+        "scenes": scenes,
+        "script": script,
+        "title": title[:100],
+        "description": (
+            f"Milo and Tilly solve a gentle meadow problem together. "
+            f"#ToonZoOfficial #Cartoon{' #Shorts' if kind == 'short' else ''}"
+        ),
+        "tags": ["ToonZo Official", "cartoon", "Milo and Tilly", "family friendly"],
+        "topic": topic,
+        "kind": kind,
+    }
 
 
 def _parse_json(text: str):
@@ -119,7 +251,14 @@ RULES:
 - Short ideas need one simple conflict and a quick payoff; long ideas need a coherent beginning, middle, and end
 
 Respond ONLY with a JSON array of strings. No other text."""
-    topics = _generate_json(prompt, "story idea")
+    try:
+        topics = _generate_json(prompt, "story idea")
+    except RuntimeError as exc:
+        print(
+            f"  Gemini unavailable for {kind} ideas; using original local ideas: {exc}",
+            flush=True,
+        )
+        return _local_topics(count, used)
     if not isinstance(topics, list) or not all(
         isinstance(topic, str) and topic.strip() for topic in topics
     ):
@@ -169,7 +308,14 @@ QUALITY: Keep the story original and suitable for a general family audience. Do 
 
 Respond ONLY with the JSON object. No other text."""
 
-    data = _generate_json(prompt, f"{kind} cartoon script")
+    try:
+        data = _generate_json(prompt, f"{kind} cartoon script")
+    except RuntimeError as exc:
+        print(
+            f"  Gemini unavailable for {kind} script; using the local story template: {exc}",
+            flush=True,
+        )
+        data = _local_script(topic, kind)
     if not isinstance(data, dict):
         raise ValueError("Gemini cartoon package must be a JSON object")
     scenes = data.get("scenes")
