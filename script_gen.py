@@ -11,42 +11,87 @@ BASE = "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateCont
 
 def _ask_gemini(prompt: str) -> str:
     for model in MODELS:
-        for attempt in range(4):
+        for attempt in range(2):
             try:
                 r = requests.post(
                     BASE.format(m=model),
                     params={"key": config.GEMINI_API_KEY},
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.92},
+                        "generationConfig": {
+                            "temperature": 0.8,
+                            "responseMimeType": "application/json",
+                            "maxOutputTokens": 8192,
+                        },
                     },
                     timeout=90,
                 )
                 if r.status_code == 200:
-                    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    payload = r.json()
+                    candidates = payload.get("candidates", [])
+                    if not candidates:
+                        raise ValueError("Gemini returned no candidates")
+                    candidate = candidates[0]
+                    finish_reason = candidate.get("finishReason")
+                    if finish_reason == "MAX_TOKENS":
+                        raise ValueError(
+                            f"Gemini response was truncated by the token limit for {model}"
+                        )
+                    parts = candidate.get("content", {}).get("parts", [])
+                    text = "".join(
+                        part.get("text", "") for part in parts if "text" in part
+                    )
+                    if not text:
+                        raise ValueError(
+                            f"Gemini returned no text (finish reason: {finish_reason})"
+                        )
+                    return text
                 print(f"  [{model}] HTTP {r.status_code}: {r.text[:200]}", flush=True)
-                if r.status_code in (429, 503):
-                    time.sleep(20 * (attempt + 1))
+                if r.status_code in (429, 500, 502, 503, 504) and attempt == 0:
+                    time.sleep(5)
                     continue
                 break
-            except Exception as e:
+            except (requests.RequestException, ValueError, KeyError) as e:
                 print(f"  [{model}] error (attempt {attempt+1}): {e}", flush=True)
-                time.sleep(10)
+                if attempt == 0:
+                    time.sleep(5)
         print(f"  [{model}] fail — next model...", flush=True)
     raise RuntimeError("Gemini API failed (all models tried)")
 
 
 def _parse_json(text: str):
-    text = re.sub(r"```json|```", "", text).strip()
-    dec = json.JSONDecoder()
-    for i, ch in enumerate(text):
-        if ch in "[{":
-            try:
-                obj, _ = dec.raw_decode(text[i:])
-                return obj
-            except json.JSONDecodeError:
-                continue
-    raise ValueError("No valid JSON: " + text[:120])
+    cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=re.I)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Gemini returned invalid JSON at line {exc.lineno}, "
+            f"column {exc.colno} (response length {len(cleaned)} characters)"
+        ) from exc
+
+
+def _generate_json(prompt: str, context: str):
+    last_error = None
+    retry_prompt = prompt
+    for attempt in range(2):
+        try:
+            return _parse_json(_ask_gemini(retry_prompt))
+        except ValueError as exc:
+            last_error = exc
+            if attempt == 0:
+                print(
+                    f"  {context} JSON invalid; requesting a fresh complete JSON response.",
+                    flush=True,
+                )
+                retry_prompt = (
+                    prompt
+                    + "\n\nThe previous response was invalid or incomplete. "
+                    "Return one complete, syntactically valid JSON value only. "
+                    "Keep every required field, but use concise scene descriptions."
+                )
+    raise RuntimeError(
+        f"Could not generate valid {context} JSON after retry: {last_error}"
+    )
 
 
 def generate_topics(count: int, kind: str, used: list, performance: dict = None) -> list:
@@ -71,7 +116,7 @@ RULES:
 - Short ideas need one simple conflict and a quick payoff; long ideas need a coherent beginning, middle, and end
 
 Respond ONLY with a JSON array of strings. No other text."""
-    topics = _parse_json(_ask_gemini(prompt))
+    topics = _generate_json(prompt, "story idea")
     if not isinstance(topics, list) or not all(
         isinstance(topic, str) and topic.strip() for topic in topics
     ):
@@ -121,7 +166,9 @@ QUALITY: Keep the story original and suitable for a general family audience. Do 
 
 Respond ONLY with the JSON object. No other text."""
 
-    data = _parse_json(_ask_gemini(prompt))
+    data = _generate_json(prompt, f"{kind} cartoon script")
+    if not isinstance(data, dict):
+        raise ValueError("Gemini cartoon package must be a JSON object")
     scenes = data.get("scenes")
     if not isinstance(scenes, list) or not scenes:
         raise ValueError("Generated cartoon package must contain a non-empty scenes array")
