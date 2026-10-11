@@ -35,7 +35,7 @@ The preview workflow does not need Pexels or YouTube credentials.
 
 ## 3. YouTube publishing — later, after preview approval
 
-Do not enable public uploads until the cartoon appearance, scripts, subtitles, audience classification, and permissions have been reviewed. Set the actual YouTube channel name to **ToonZo Official** in YouTube Studio. Upload mode verifies the OAuth account's exact channel name and checks its latest 50 video titles against generated titles. For authorized YouTube uploads, create OAuth credentials locally and generate a refresh token with `get_refresh_token.py`. Never commit the OAuth JSON file.
+Do not enable public uploads until the cartoon appearance, scripts, subtitles, audience classification, and permissions have been reviewed. Set the actual YouTube channel name to **ToonZo Official** in YouTube Studio. Upload mode verifies the OAuth account's exact channel name and checks its latest 50 video titles against generated titles. For authorized YouTube uploads, create OAuth credentials locally and generate a refresh token with `get_refresh_token.py`; the script saves the token under the ignored `local_secrets/` folder rather than printing the credential. Never commit the OAuth JSON or token file.
 
 When production publishing is intentionally enabled, add these repository Actions secrets:
 
