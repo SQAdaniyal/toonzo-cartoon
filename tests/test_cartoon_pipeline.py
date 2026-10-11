@@ -54,6 +54,8 @@ class CartoonPipelineTests(unittest.TestCase):
 
         self.assertEqual(value, {"title": "A New Kite"})
         self.assertEqual(ask.call_count, 2)
+        self.assertEqual(ask.call_args_list[0].args, ("prompt", 0))
+        self.assertEqual(ask.call_args_list[1].args[1], 1)
 
     def test_gemini_switches_models_after_unavailable_response(self):
         successful_response = Mock(

@@ -10,8 +10,9 @@ MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
 BASE = "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
 
 
-def _ask_gemini(prompt: str) -> str:
-    for model in MODELS:
+def _ask_gemini(prompt: str, starting_model: int = 0) -> str:
+    model_order = MODELS[starting_model:] + MODELS[:starting_model]
+    for model in model_order:
         for attempt in range(3):
             try:
                 r = requests.post(
@@ -74,14 +75,15 @@ def _parse_json(text: str):
 def _generate_json(prompt: str, context: str):
     last_error = None
     retry_prompt = prompt
-    for attempt in range(2):
+    for attempt, starting_model in enumerate(range(len(MODELS))):
         try:
-            return _parse_json(_ask_gemini(retry_prompt))
+            return _parse_json(_ask_gemini(retry_prompt, starting_model))
         except ValueError as exc:
             last_error = exc
-            if attempt == 0:
+            if attempt < len(MODELS) - 1:
                 print(
-                    f"  {context} JSON invalid; requesting a fresh complete JSON response.",
+                    f"  {context} JSON invalid; retrying with model "
+                    f"{MODELS[(starting_model + 1) % len(MODELS)]}.",
                     flush=True,
                 )
                 retry_prompt = (
