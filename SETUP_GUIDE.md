@@ -2,7 +2,7 @@
 
 ## Current workflow status
 
-The GitHub Action is configured to schedule **one long video and four Shorts daily**, starting at 3:00 AM Pakistan time (22:00 UTC). Scheduled and manually started workflow runs publish publicly and mark videos Made for Kids, as selected by the channel owner. The overnight time is a trial to avoid peak demand, not a guarantee of Gemini availability. GitHub's schedule is best-effort and may start late.
+The GitHub Action targets **one long video and four Shorts daily**. It runs at 3:17 AM Pakistan time (22:17 UTC), with same-day recovery passes at 10:17 AM and 5:17 PM Pakistan time (05:17 and 12:17 UTC) to fill missing videos. Scheduled and manual runs publish publicly and mark videos Made for Kids, as selected by the channel owner. GitHub scheduling and external APIs are best-effort; recovery passes cannot guarantee delivery during an outage or account/configuration problem.
 
 ## 1. Install locally
 
@@ -29,7 +29,7 @@ The output MP4 and SRT files are created in `output/`.
 2. Review a local preview before publishing if you have not already reviewed the cartoon style.
 3. Open **Actions → ToonZo Daily Cartoons → Run workflow** to publish a batch immediately.
 
-Each manual run can publish one long video and four Shorts publicly. Do not start another run unless you want another batch; manual runs require the same YouTube credentials as scheduled runs.
+Manual runs use the same daily target guard and publish only videos still missing that day. They require the same YouTube credentials as scheduled runs.
 
 ## 3. Scheduled YouTube publishing
 
@@ -45,7 +45,7 @@ All GitHub workflow runs are configured for public visibility and Made for Kids.
 
 ## Target and schedule
 
-The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. The daily schedule starts at 3:00 AM Pakistan time to try a different API-demand window; Google does not guarantee that this time has lower demand. GitHub-hosted standard runners are free for this public repository; GitHub schedule timing is best-effort.
+The configured target is `LONG_VIDEOS_PER_DAY = 1` and `SHORTS_PER_DAY = 4`. The schedule runs at 3:17 AM, 10:17 AM, and 5:17 PM Pakistan time (22:17, 05:17, and 12:17 UTC). Each recovery run checks recent uploads on the authorized YouTube channel and only generates the remaining amount, preventing a successful batch from being duplicated. GitHub schedules avoid the top of the hour; timing is still best-effort.
 
 If Gemini reports exhausted quota or all configured models are unavailable, the pipeline stops calling blocked models and uses original local story templates for the remaining content. This keeps the run independent of further Gemini quota, but fallback stories are simpler and less varied. YouTube, OAuth, Actions availability, and API permissions can still prevent a successful upload.
 

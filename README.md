@@ -4,9 +4,9 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 
 ## Current status
 
-- Configured production target: **1 long video and 4 Shorts per run**.
-- Scheduled GitHub Action runs target **1 long cartoon + 4 Shorts daily**, and upload them publicly, starting at 3:00 AM Pakistan time. The overnight time is a trial to avoid peak demand; Gemini availability is not guaranteed. GitHub schedule timing is best-effort.
-- Clicking **Run workflow** manually also publishes the generated videos publicly. Each run can upload up to five videos; avoid starting extra runs if you only want the daily batch.
+- Configured production target: **1 long video and 4 Shorts per Pakistan-local day**.
+- Scheduled GitHub Action runs target **1 long cartoon + 4 Shorts daily**, and upload them publicly. It runs at 3:17 AM Pakistan time, with recovery passes at 10:17 AM and 5:17 PM for any missing uploads. GitHub schedules and external APIs remain best-effort; the recovery run counts completed uploads and fills only the remaining daily target.
+- Clicking **Run workflow** manually follows the same daily target guard and publishes only videos still missing for that Pakistan-local day, up to five total.
 - Local runs default to preview-only. Only `GEMINI_API_KEY` is needed for a local preview; Actions uploads also require the YouTube secrets below.
 - If Gemini's free quota is exhausted or all configured models are unavailable, the pipeline switches to original local story templates so a run can continue without more Gemini requests. These fallback episodes are simpler and less varied than AI-generated scripts.
 - Frames are branded **ToonZo Official**. Upload mode verifies the authorized channel title is exactly `ToonZo Official` and checks recent YouTube titles plus saved topic, title, and script history before uploading.
@@ -40,7 +40,7 @@ Generated videos and subtitles are saved under `output/`.
 
 ## GitHub Actions setup
 
-Add `GEMINI_API_KEY`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, and `YT_REFRESH_TOKEN` under **Settings → Secrets and variables → Actions**. Both scheduled runs and **Run workflow** publish up to five videos publicly. Review a previously generated preview locally or from an earlier Actions artifact before starting a manual upload.
+Add `GEMINI_API_KEY`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, and `YT_REFRESH_TOKEN` under **Settings → Secrets and variables → Actions**. Scheduled runs and **Run workflow** publish up to five videos publicly, subject to the daily target guard. Review a generated preview before the first upload.
 
 Do not add API keys or OAuth JSON files to the repository. Any keys shared in chat should be revoked and replaced before use.
 

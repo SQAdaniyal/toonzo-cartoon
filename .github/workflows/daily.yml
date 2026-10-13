@@ -2,8 +2,11 @@ name: ToonZo Daily Cartoons
 
 on:
   schedule:
-    # 3:00 AM Pakistan time (22:00 UTC). GitHub schedule timing is best-effort.
-    - cron: "0 22 * * *"
+    # 3:17 AM Pakistan time (22:17 UTC); avoid the top-of-hour load spike.
+    - cron: "17 22 * * *"
+    # Recovery passes at 10:17 AM and 5:17 PM Pakistan time.
+    - cron: "17 5 * * *"
+    - cron: "17 12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -39,7 +42,21 @@ jobs:
           UPLOAD_TO_YOUTUBE: "true"
           YOUTUBE_PRIVACY_STATUS: public
           YOUTUBE_MADE_FOR_KIDS: "true"
-        run: python main.py
+        run: python -u main.py 2>&1 | tee run.log
+        shell: bash
+
+      - name: Keep run log and rendered videos for recovery
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonzo-run-${{ github.run_id }}
+          path: |
+            run.log
+            output/**/*.mp4
+            output/**/*.srt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Save topic and title history
         if: always()
@@ -54,8 +71,12 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Save ToonZo content history [skip ci]"
             for attempt in 1 2 3; do
-              git fetch origin \
-                "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/$GITHUB_REF_NAME"
+              if ! git fetch origin \
+                "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/$GITHUB_REF_NAME"; then
+                echo "History fetch attempt $attempt failed; retrying."
+                sleep 2
+                continue
+              fi
               if ! git rebase "origin/$GITHUB_REF_NAME"; then
                 git rebase --abort
                 echo "Could not rebase content history onto the latest branch."

@@ -33,12 +33,12 @@ def get_video_statistics(video_ids: list) -> dict:
     return statistics
 
 
-def get_channel_identity_and_recent_titles() -> tuple[str, list[str]]:
-    """Return the authorized channel title and its latest uploaded video titles."""
+def get_channel_identity_and_recent_uploads() -> tuple[str, list[dict]]:
+    """Return the authorized channel title and recent uploads with timestamps."""
     yt = _youtube()
     response = yt.channels().list(
         part="snippet,contentDetails", mine=True
-    ).execute()
+    ).execute(num_retries=5)
     channels = response.get("items", [])
     if not channels:
         raise RuntimeError("YouTube OAuth did not return an authorized channel")
@@ -55,13 +55,21 @@ def get_channel_identity_and_recent_titles() -> tuple[str, list[str]]:
 
     playlist = yt.playlistItems().list(
         part="snippet", playlistId=uploads_playlist, maxResults=50
-    ).execute()
-    titles = [
-        item.get("snippet", {}).get("title", "")
-        for item in playlist.get("items", [])
-        if item.get("snippet", {}).get("title")
-    ]
-    return channel_title, titles
+    ).execute(num_retries=5)
+    recent_uploads = []
+    for item in playlist.get("items", []):
+        snippet = item.get("snippet", {})
+        title = snippet.get("title", "")
+        video_id = snippet.get("resourceId", {}).get("videoId")
+        published_at = snippet.get("publishedAt")
+        if title and video_id:
+            recent_uploads.append({
+                "video_id": video_id,
+                "title": title,
+                "uploaded_at": published_at,
+                "kind": "short" if "#shorts" in title.lower() else "long",
+            })
+    return channel_title, recent_uploads
 
 
 def upload_video(path: str, title: str, description: str, tags: list) -> str:
