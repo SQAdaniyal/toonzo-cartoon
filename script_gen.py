@@ -6,7 +6,7 @@ import time
 import requests
 import config
 
-MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"]
 BASE = "https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
 _QUOTA_BLOCKED_MODELS = set()
 _UNAVAILABLE_MODELS = set()
@@ -193,6 +193,21 @@ def _local_script(topic: str, kind: str) -> dict:
     }
 
 
+def _condense_short_narrations(scenes: list, word_limit: int) -> list[str]:
+    """Keep each story beat, using its first sentence within a Short-length budget."""
+    per_scene_limit = max(1, word_limit // len(scenes))
+    condensed = []
+    for scene in scenes:
+        narration = scene["narration"].strip()
+        sentences = re.split(r"(?<=[.!?])\s+", narration)
+        sentence = next((part.strip() for part in sentences if part.strip()), narration)
+        words = sentence.split()
+        if len(words) > per_scene_limit:
+            sentence = " ".join(words[:per_scene_limit]).rstrip(",;:") + "…"
+        condensed.append(sentence)
+    return condensed
+
+
 def _parse_json(text: str):
     cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text.strip(), flags=re.I)
     try:
@@ -345,9 +360,20 @@ Respond ONLY with the JSON object. No other text."""
     if not isinstance(provided_script, str) or provided_script.strip() != scene_script:
         data["script"] = scene_script
     if kind == "short" and len(scene_script.split()) > config.SHORT_TARGET_WORDS:
-        raise ValueError(
-            f"Generated Short script exceeds {config.SHORT_TARGET_WORDS} words"
+        original_words = len(scene_script.split())
+        print(
+            f"  Short narration was {original_words} words; keeping each scene's "
+            f"opening beat within {config.SHORT_TARGET_WORDS} words.",
+            flush=True,
         )
+        for scene, narration in zip(
+            normalized_scenes,
+            _condense_short_narrations(normalized_scenes, config.SHORT_TARGET_WORDS),
+        ):
+            scene["narration"] = narration
+        scene_script = " ".join(scene["narration"] for scene in normalized_scenes)
+        data["scenes"] = normalized_scenes
+        data["script"] = scene_script
     data.setdefault("title", topic[:90])
     data.setdefault("description", "An original ToonZo Official cartoon adventure. #ToonZoOfficial #Cartoon")
     data.setdefault("tags", ["ToonZo Official", "cartoon", "animation"])
