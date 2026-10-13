@@ -15,7 +15,7 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 ## Pipeline
 
 1. Generate original, non-franchise story ideas and scene-by-scene scripts.
-2. Create English narration using `edge-tts`.
+2. Create English narration with Edge TTS and local eSpeak NG fallback.
 3. Draw original vector-like cartoon scenes locally with Pillow.
 4. Add subtle character motion, story captions, and SRT subtitles.
 5. Render horizontal long videos and vertical Shorts with MoviePy/FFmpeg.
