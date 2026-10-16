@@ -244,7 +244,8 @@ def _generate_json(prompt: str, context: str):
     )
 
 
-def generate_topics(count: int, kind: str, used: list, performance: dict = None) -> list:
+def generate_topics(count: int, kind: str, used: list, performance: dict = None,
+                    research: list = None) -> list:
     style = (
         "3-5 minute cartoon episode"
         if kind == "long"
@@ -263,6 +264,8 @@ RULES:
 - Give each story a distinct premise; do not repeat these previous topics: {json.dumps(used[-150:], ensure_ascii=False)}
 - Use this performance signal only as a directional guide; create fresh ideas:
 {json.dumps((performance or {}).get(kind, {}), ensure_ascii=False)}
+- Use these optional YouTube research notes only for broad storytelling lessons. Never copy plots, characters, dialogue, titles, visuals, or creator styles. Create materially original premises:
+{json.dumps(research or [], ensure_ascii=False)[:12000]}
 - Short ideas need one simple conflict and a quick payoff; long ideas need a coherent beginning, middle, and end
 
 Respond ONLY with a JSON array of strings. No other text."""

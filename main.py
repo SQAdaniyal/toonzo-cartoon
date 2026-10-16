@@ -113,7 +113,8 @@ def get_daily_upload_counts(history: list, recent_uploads: list,
 
 
 def generate_unique_topics(count: int, kind: str, used: list,
-                           performance: dict, additional_topics: list = None) -> list:
+                           performance: dict, additional_topics: list = None,
+                           research: list = None) -> list:
     selected = []
     seen = {normalize_text(topic) for topic in used}
     seen.update(normalize_text(topic) for topic in (additional_topics or []))
@@ -125,6 +126,7 @@ def generate_unique_topics(count: int, kind: str, used: list,
             kind,
             used + (additional_topics or []) + selected,
             performance,
+            research,
         )
         for topic in candidates:
             normalized = normalize_text(topic)
@@ -315,12 +317,22 @@ def main():
         short_count = config.SHORTS_PER_DAY
 
     performance = get_topic_performance(history) if config.UPLOAD_TO_YOUTUBE else {}
+    research = []
+    if os.path.exists(config.RESEARCH_NOTES_FILE):
+        try:
+            with open(config.RESEARCH_NOTES_FILE, encoding="utf-8") as f:
+                research = json.load(f)
+            if not isinstance(research, list):
+                research = []
+            print(f"YouTube research notes loaded: {len(research)} video(s).")
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"Research notes unavailable; continuing without them: {exc}")
     print("ToonZo ke original cartoon ideas generate ho rahe hain...")
     long_topics = generate_unique_topics(
-        long_count, "long", used, performance
+        long_count, "long", used, performance, research=research
     ) if long_count else []
     short_topics = generate_unique_topics(
-        short_count, "short", used, performance, long_topics
+        short_count, "short", used, performance, long_topics, research
     ) if short_count else []
     print("Long :", long_topics)
     print("Short:", short_topics)

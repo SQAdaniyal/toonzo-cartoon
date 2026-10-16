@@ -15,7 +15,7 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 ## Pipeline
 
 1. Generate original, non-franchise story ideas and scene-by-scene scripts.
-2. Create English narration with Gemini TTS and Edge Neural fallback.
+2. Create natural English narration using Gemini TTS, with Edge Neural as backup.
 3. Draw original vector-like cartoon scenes locally with Pillow.
 4. Add subtle character motion, story captions, and SRT subtitles.
 5. Render horizontal long videos and vertical Shorts with MoviePy/FFmpeg.
@@ -37,6 +37,32 @@ python main.py
 ```
 
 Generated videos and subtitles are saved under `output/`.
+
+## Research ideas for every channel
+
+The research helper sends public YouTube video URLs directly to Gemini and saves channel-specific notes. It uses the existing `GEMINI_API_KEY`; no TranscriptAPI account or key is needed. The available profiles match this workspace's four channel projects:
+
+```powershell
+python youtube_research.py --channel toonzo "https://www.youtube.com/watch?v=VIDEO_ID"
+python main.py
+
+python youtube_research.py --channel neuraledge "https://www.youtube.com/watch?v=VIDEO_ID"
+Push-Location _channel_repos/neuraledge-automation; python main.py; Pop-Location
+
+python youtube_research.py --channel scarewire "https://www.youtube.com/watch?v=VIDEO_ID"
+Push-Location _channel_repos/automation-learning-yt; python main.py; Pop-Location
+
+python youtube_research.py --channel factsbaaz "https://www.youtube.com/watch?v=VIDEO_ID"
+Push-Location _channel_repos/yt-automation; python main.py; Pop-Location
+```
+
+Pass several public video URLs in one run. Each channel gets its own `research_notes.json`, and its topic generator applies that channel's niche and fact-checking or originality rules. For research-based factual channels, video notes are only for inspiration; factual claims still need independent verification. Notes stay active until replaced or cleared:
+
+```powershell
+python youtube_research.py --channel toonzo --clear
+```
+
+Gemini's direct YouTube URL input is currently documented as a preview; availability and limits can change.
 
 ## GitHub Actions setup
 
