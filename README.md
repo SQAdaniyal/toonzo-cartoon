@@ -8,14 +8,14 @@ Free-first cartoon production project for original family-friendly ToonZo storie
 - Scheduled GitHub Action runs target **1 long cartoon + 4 Shorts daily**, and upload them publicly. It runs at 3:17 AM Pakistan time, with recovery passes at 10:17 AM and 5:17 PM for any missing uploads. GitHub schedules and external APIs remain best-effort; the recovery run counts completed uploads and fills only the remaining daily target.
 - Clicking **Run workflow** manually follows the same daily target guard and publishes only videos still missing for that Pakistan-local day, up to five total.
 - Local runs default to preview-only. Only `GEMINI_API_KEY` is needed for a local preview; Actions uploads also require the YouTube secrets below.
-- If Gemini's free quota is exhausted or all configured models are unavailable, the pipeline switches to original local story templates so a run can continue without more Gemini requests. These fallback episodes are simpler and less varied than AI-generated scripts.
+- If Gemini's free quota is exhausted or all configured models are unavailable, the pipeline switches to original local story templates so a run can continue without more Gemini requests. These fallback episodes are simpler and less varied than AI-generated scripts. Gemini TTS falls back to Edge Neural; if both services fail, narration stops instead of switching to robotic offline speech.
 - Frames are branded **ToonZo Official**. Upload mode verifies the authorized channel title is exactly `ToonZo Official` and checks recent YouTube titles plus saved topic, title, and script history before uploading.
 - This is a lightweight 2D animation MVP, not a full generative-image or character lip-sync system.
 
 ## Pipeline
 
 1. Generate original, non-franchise story ideas and scene-by-scene scripts.
-2. Create English narration with Edge TTS and local eSpeak NG fallback.
+2. Create English narration with Gemini TTS and Edge Neural fallback.
 3. Draw original vector-like cartoon scenes locally with Pillow.
 4. Add subtle character motion, story captions, and SRT subtitles.
 5. Render horizontal long videos and vertical Shorts with MoviePy/FFmpeg.

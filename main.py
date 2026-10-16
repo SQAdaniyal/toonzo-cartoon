@@ -211,7 +211,7 @@ def make_one(topic: str, kind: str, idx: int, history: list,
             pkg["title"] = pkg["title"].rstrip() + " #Shorts"
         hook_text = pkg.get("hook_text", topic.upper()[:40])
 
-        print("2) Voiceover ban raha hai (edge-tts)...")
+        print("2) Natural voiceover ban raha hai (Gemini TTS / Edge Neural)...")
         audio = tts.make_voiceover(
             pkg["script"], os.path.join(workdir, "voice.mp3")
         )
