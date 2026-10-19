@@ -19,6 +19,7 @@ SHORTS_PER_DAY = 4
 VOICE = "en-US-GuyNeural"
 VOICE_RATE = "+0%"
 GEMINI_TTS_MODEL = "gemini-3.8-flash-tts"
+GEMINI_TTS_FALLBACK_MODEL = "gemini-2.8-flash-tts"
 GEMINI_TTS_VOICE = "Leda"
 GEMINI_TTS_STYLE = "Warm, lively children's story narration with conversational phrasing, gentle emotion, and a relaxed pace."
 

@@ -20,14 +20,15 @@ def _profile_for_voice(voice):
     return {}
 
 
-def _gemini_voiceover(text, out_path, voice, style):
+def _gemini_voiceover(text, out_path, voice, style, model=None):
     if not config.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is missing")
+    model = model or getattr(config, "GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
     response = requests.post(
         API_URL,
         headers={"x-goog-api-key": config.GEMINI_API_KEY},
         json={
-            "model": getattr(config, "GEMINI_TTS_MODEL", "gemini-3.8-flash-tts"),
+            "model": model,
             "input": [{
                 "type": "user_input",
                 "content": [{
@@ -79,13 +80,22 @@ def make_voiceover(text: str, out_path: str, voice: str = None,
         config, "GEMINI_TTS_STYLE", "Natural, conversational narration with clear pronunciation and a relaxed pace."
     )
     gemini_error = None
-    try:
-        result = _gemini_voiceover(text, out_path, gemini_voice, style)
-        print(f"  Natural Gemini TTS voice generated ({gemini_voice}).")
-        return result
-    except (requests.RequestException, RuntimeError, ValueError, KeyError, json.JSONDecodeError) as error:
-        gemini_error = error
-        print(f"  Gemini TTS unavailable ({type(error).__name__}); trying Edge Neural.")
+    primary_model = getattr(config, "GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
+    fallback_model = getattr(
+        config, "GEMINI_TTS_FALLBACK_MODEL", "gemini-2.8-flash-tts"
+    )
+    models = [primary_model]
+    if fallback_model and fallback_model != primary_model:
+        models.append(fallback_model)
+    for model in models:
+        try:
+            result = _gemini_voiceover(text, out_path, gemini_voice, style, model)
+            print(f"  Natural Gemini TTS voice generated ({gemini_voice}, {model}).")
+            return result
+        except (requests.RequestException, RuntimeError, ValueError, KeyError, json.JSONDecodeError) as error:
+            gemini_error = error
+            print(f"  Gemini TTS unavailable ({model}, {type(error).__name__}).")
+    print("  Trying Edge Neural.")
 
     edge_voice = profile.get("voice") or voice or getattr(config, "VOICE", "en-US-GuyNeural")
     edge_rate = rate or profile.get("rate") or getattr(config, "VOICE_RATE", "+0%")
