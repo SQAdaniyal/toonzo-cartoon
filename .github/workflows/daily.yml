@@ -1,12 +1,6 @@
 name: ToonZo Daily Cartoons
 
 on:
-  schedule:
-    # 3:17 AM Pakistan time (22:17 UTC); avoid the top-of-hour load spike.
-    - cron: "17 22 * * *"
-    # Recovery passes at 10:17 AM and 5:17 PM Pakistan time.
-    - cron: "17 5 * * *"
-    - cron: "17 12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -18,6 +12,7 @@ concurrency:
 
 jobs:
   generate-and-upload:
+    if: false # Paused during channel consolidation; Facts Baaz is the active channel.
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
